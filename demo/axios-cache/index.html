@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Axios 缓存请求数据示例</title>
+    <script src="./qs.min.js"></script>
+    <script src="./axios.min.js"></script>
+  </head>
+  <body>
+    <h3><a href="https://juejin.cn/post/6974902702400602148" target="_blank" title="掘金链接">缓存请求数据示例</a></h3>
+    <button onclick="requestWithCache()">使用缓存</button>
+    <button onclick="requestWithoutCache()">不使用缓存</button>
+    <script>
+      const MemoryCache = {
+        data: {},
+        // 保存数据，支持设置缓存的最大时间，即 maxAge 单位为毫秒
+        set(key, value, maxAge) {
+          this.data[key] = {
+            maxAge: maxAge || 0,
+            value,
+            now: Date.now(),
+          };
+        },
+        // 从缓存中获取指定 key 对应的值
+        get(key) {
+          const cachedItem = this.data[key];
+          if (!cachedItem) return null;
+          const isExpired = Date.now() - cachedItem.now > cachedItem.maxAge;
+          isExpired && this.delete(key);
+          return isExpired ? null : cachedItem.value;
+        },
+        // 从缓存中删除指定 key 对应的值
+        delete(key) {
+          return delete this.data[key];
+        },
+        // 清空已缓存的数据
+        clear() {
+          this.data = {};
+        },
+      };
+      // 根据当前请求的信息，生成请求 Key，将作为缓存项的 key，而对应的 value 就是默认 xhrAdapter 适配器返回的 Promise 对象
+      function generateReqKey(config) {
+        const { method, url, params, data } = config;
+        return [method, url, Qs.stringify(params), Qs.stringify(data)].join(
+          "&"
+        );
+      }
+
+      function isCacheLike(cache) {
+        return !!(
+          cache.set &&
+          cache.get &&
+          cache.delete &&
+          cache.clear &&
+          typeof cache.get === "function" &&
+          typeof cache.set === "function" &&
+          typeof cache.delete === "function" &&
+          typeof cache.clear === "function"
+        );
+      }
+
+      function cacheAdapterEnhancer(adapter, options) {
+        // maxAge：全局设置缓存的最大时间；
+        // enabledByDefault：是否启用缓存，默认为 true；
+        // cacheFlag：缓存标志，用于配置请求 config 对象上的缓存属性；
+        // defaultCache：用于设置使用的缓存对象
+        const {
+          maxAge,
+          enabledByDefault = true,
+          cacheFlag = "cache",
+          defaultCache = MemoryCache,
+        } = options;
+        return (config) => {
+          const { url, method, params, forceUpdate } = config;
+          let useCache =
+            config[cacheFlag] !== undefined && config[cacheFlag] !== null
+              ? config[cacheFlag]
+              : enabledByDefault;
+          if (method === "get" && useCache) {
+            const cache = isCacheLike(useCache) ? useCache : defaultCache;
+            let requestKey = generateReqKey(config); // 生成请求Key
+            let responsePromise = cache.get(requestKey); // 从缓存中获取请求key对应的响应对象
+            if (!responsePromise || forceUpdate) { // 缓存未命中/失效或强制更新时，则重新请求数据
+              responsePromise = (async () => {
+                try {
+                  return await adapter(config); // 使用默认的xhrAdapter发送请求
+                } catch (reason) {
+                  cache.delete(requestKey);
+                  throw reason;
+                }
+              })();
+              cache.set(requestKey, responsePromise, maxAge); // 保存请求返回的响应对象
+              return responsePromise; // 返回已保存的响应对象
+            }
+            return responsePromise;
+          }
+
+          return adapter(config); // 使用默认的xhrAdapter发送请求
+        };
+      }
+
+      const http = axios.create({
+        baseURL: "https://jsonplaceholder.typicode.com",
+        adapter: cacheAdapterEnhancer(axios.defaults.adapter, {
+          enabledByDefault: false,
+          maxAge: 5000,
+        }),
+      });
+
+      async function requestWithCache() {
+        for (const iterator of [1,2,3]) {
+          const response = await http.get("/todos/1", { cache: true });
+          console.dir(response);
+        }
+      }
+
+      async function requestWithoutCache() {
+        const response = await http.get("/todos/1", { cache: false });
+        console.dir(response);
+      }
+    </script>
+  </body>
+</html>

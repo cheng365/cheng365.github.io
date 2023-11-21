@@ -10,3 +10,4 @@
 - [lodop打印模板设计器](https://cheng365.github.io/demo/lodop-print-designer/index.html) `https://cheng365.github.io/demo/lodop-print-designer/index.html`
 - [vxe-table文档-v3](https://cheng365.github.io/demo/vxetable/v3/index.html) `https://cheng365.github.io/demo/vxetable/v3/index.html`
 - [vxe-table文档-v4](https://cheng365.github.io/demo/vxetable/v4/index.html) `https://cheng365.github.io/demo/vxetable/v4/index.html`
+- [Axios缓存请求数据](https://cheng365.github.io/demo/axios-cache/index.html) `https://cheng365.github.io/demo/axios-cache/index.html`
